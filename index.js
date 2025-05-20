@@ -5,6 +5,7 @@ const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
+// const slugify = require('slugify'); // Not using slugify anymore for this
 
 const app = express();
 const port = process.env.PORT || 3000; // Use port from .env or default to 3000
@@ -30,7 +31,8 @@ const upload = multer({ storage: storage });
 
 // Middleware to serve static files (for frontend)
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/data', express.static(dataDir)); // Serve media files
+// We will serve files through a custom route now, so direct static serving of /data is commented out.
+// app.use('/data', express.static(dataDir));
 
 // In-memory store for media metadata (can be replaced with a database later)
 let mediaStore = [];
@@ -42,14 +44,23 @@ app.post('/api/media', upload.single('mediaFile'), (req, res) => {
     if (!req.file) {
         return res.status(400).send('No file uploaded.');
     }
+
+    const id = req.file.filename.split('.')[0]; // UUID part of the filename
+    const displayName = req.body.displayName || req.file.originalname;
+    // Preserve case and replace spaces with %20 for the URL path segment
+    const urlFriendlyDisplayName = displayName.replace(/ /g, '%20');
+    const fileExtension = path.extname(req.file.originalname);
+
     const media = {
-        id: req.file.filename.split('.')[0], // Use the unique part of the filename as ID
+        id: id,
         originalName: req.file.originalname,
-        filename: req.file.filename,
-        path: req.file.path,
+        displayName: displayName,
+        filename: req.file.filename, // The actual UUID-based filename on disk (e.g., uuid.ext)
+        path: req.file.path,       // Full path to the file on disk
         mimetype: req.file.mimetype,
         size: req.file.size,
-        url: `/data/${req.file.filename}`, // URL to access the media
+        // URL format: /media/Display%20Name.extension/uuid
+        url: `/media/${urlFriendlyDisplayName}${fileExtension}/${id}`,
         createdAt: new Date()
     };
     mediaStore.push(media);
@@ -97,6 +108,36 @@ app.get('/api/media/:id/url', (req, res) => {
     // Add a dummy token for demonstration if needed, or just return the direct URL.
     const baseUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
     res.json({ signedUrl: `${baseUrl}${media.url}` });
+});
+
+// New route to serve media files using the user-friendly URL
+// Example: GET /media/My%20Cool%20Picture.jpg/a1b2c3d4
+// The :displayNameWithExtension part will be URL-decoded by Express automatically
+// so "My%20Cool%20Picture.jpg" becomes "My Cool Picture.jpg" in req.params.displayNameWithExtension
+app.get('/media/:displayNameWithExtension/:mediaId', (req, res) => {
+    const { displayNameWithExtension, mediaId } = req.params; // mediaId is the UUID
+
+    // We find media primarily by ID, as it's unique.
+    // The displayNameWithExtension in the path is for user-friendliness and SEO,
+    // but the lookup is based on the unique mediaId.
+    const media = mediaStore.find(m => m.id === mediaId);
+
+    if (media) {
+        // Security check: an attacker could try to manipulate the slug to access other files
+        // if we weren't careful. Here, we rely on the `media.path` which was set securely
+        // during upload and is based on the UUID filename.
+        if (fs.existsSync(media.path)) {
+            // Optional: Set Content-Disposition to suggest original filename for download
+            // res.setHeader('Content-Disposition', `inline; filename="${media.originalName}"`);
+            res.sendFile(media.path);
+        } else {
+            console.error('File not found on disk for ID:', mediaId, media.path);
+            res.status(404).send('File not found on disk.');
+        }
+    } else {
+        console.log('Media metadata not found for ID:', mediaId);
+        res.status(404).send('Media not found.');
+    }
 });
 
 

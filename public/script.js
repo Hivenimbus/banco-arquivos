@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const mediaFileInput = document.getElementById('mediaFile');
+    const displayNameInput = document.getElementById('displayName');
     const uploadButton = document.getElementById('uploadButton');
     const uploadStatus = document.getElementById('uploadStatus');
     const mediaListDiv = document.getElementById('mediaList');
@@ -36,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (media.mimetype.startsWith('image/')) {
                 previewElement = document.createElement('img');
                 previewElement.src = media.url;
-                previewElement.alt = media.originalName;
+                previewElement.alt = media.displayName || media.originalName;
             } else if (media.mimetype.startsWith('video/')) {
                 previewElement = document.createElement('video');
                 previewElement.src = media.url;
@@ -50,14 +51,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 previewElement.textContent = `📄`; // File icon
                 const link = document.createElement('a');
                 link.href = media.url;
-                link.textContent = media.originalName;
+                link.textContent = media.displayName || media.originalName;
                 link.target = "_blank";
                 previewElement.appendChild(document.createElement('br'));
                 previewElement.appendChild(link);
             }
 
             const nameP = document.createElement('p');
-            nameP.innerHTML = `<strong>Name:</strong> ${media.originalName}`;
+            nameP.innerHTML = `<strong>Name:</strong> ${media.displayName || media.originalName}`;
 
             const idAndDateP = document.createElement('p');
             idAndDateP.innerHTML = `<strong>ID:</strong> ${media.id}<br><strong>Uploaded:</strong> ${new Date(media.createdAt).toLocaleString()}`;
@@ -91,6 +92,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Upload media ---
     uploadButton.addEventListener('click', async () => {
         const file = mediaFileInput.files[0];
+        const displayName = displayNameInput.value.trim();
+
         if (!file) {
             uploadStatus.textContent = 'Please select a file to upload.';
             uploadStatus.style.color = 'red';
@@ -99,6 +102,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const formData = new FormData();
         formData.append('mediaFile', file);
+        if (displayName) {
+            formData.append('displayName', displayName);
+        }
 
         uploadStatus.textContent = 'Uploading...';
         uploadStatus.style.color = 'orange';
@@ -115,9 +121,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const result = await response.json();
-            uploadStatus.textContent = `Successfully uploaded: ${result.originalName}`;
+            uploadStatus.textContent = `Successfully uploaded: ${result.displayName || result.originalName}`;
             uploadStatus.style.color = 'green';
-            mediaFileInput.value = ''; // Clear the input
+            mediaFileInput.value = ''; // Clear the file input
+            displayNameInput.value = ''; // Clear the display name input
             fetchMedia(); // Refresh the list
         } catch (error) {
             console.error('Error uploading file:', error);
