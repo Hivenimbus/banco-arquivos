@@ -59,8 +59,8 @@ app.post('/api/media', upload.single('mediaFile'), (req, res) => {
         path: req.file.path,       // Full path to the file on disk
         mimetype: req.file.mimetype,
         size: req.file.size,
-        // URL format: /media/Display%20Name.extension/uuid
-        url: `/media/${urlFriendlyDisplayName}${fileExtension}/${id}`,
+        // URL format: /media/uuid/Display%20Name.extension
+        url: `/media/${id}/${urlFriendlyDisplayName}${fileExtension}`,
         createdAt: new Date()
     };
     mediaStore.push(media);
@@ -111,11 +111,10 @@ app.get('/api/media/:id/url', (req, res) => {
 });
 
 // New route to serve media files using the user-friendly URL
-// Example: GET /media/My%20Cool%20Picture.jpg/a1b2c3d4
+// Example: GET /media/a1b2c3d4/My%20Cool%20Picture.jpg
 // The :displayNameWithExtension part will be URL-decoded by Express automatically
-// so "My%20Cool%20Picture.jpg" becomes "My Cool Picture.jpg" in req.params.displayNameWithExtension
-app.get('/media/:displayNameWithExtension/:mediaId', (req, res) => {
-    const { displayNameWithExtension, mediaId } = req.params; // mediaId is the UUID
+app.get('/media/:mediaId/:displayNameWithExtension', (req, res) => {
+    const { mediaId, displayNameWithExtension } = req.params; // mediaId is the UUID
 
     // We find media primarily by ID, as it's unique.
     // The displayNameWithExtension in the path is for user-friendliness and SEO,
