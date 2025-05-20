@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Storage</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Media Storage</h1>
+
+        <div class="upload-section">
+            <h2>Add New Media</h2>
+            <input type="file" id="mediaFile" name="mediaFile">
+            <button id="uploadButton">Upload</button>
+            <p id="uploadStatus"></p>
+        </div>
+
+        <div class="media-list-section">
+            <h2>Stored Media</h2>
+            <div id="mediaList">
+                <!-- Media items will be populated here by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
