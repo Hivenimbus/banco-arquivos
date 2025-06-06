@@ -1,14 +1,14 @@
 require('dotenv').config(); // Load environment variables
 
 const express = require('express');
-const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
-const fs = require('fs');
 const path = require('path');
-// const slugify = require('slugify'); // Not using slugify anymore for this
+const fs = require('fs');
+
+// Import API routes
+const { router: apiRouter, mediaStore } = require('./routes/api');
 
 const app = express();
-const port = process.env.PORT || 3000; // Use port from .env or default to 3000
+const port = process.env.PORT || 3000;
 
 // Create data directory if it doesn't exist
 const dataDir = path.join(__dirname, 'data');
@@ -16,130 +16,118 @@ if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir);
 }
 
-// Multer setup for file uploads
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, dataDir);
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = uuidv4();
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
+// Create routes directory if it doesn't exist
+const routesDir = path.join(__dirname, 'routes');
+if (!fs.existsSync(routesDir)) {
+    fs.mkdirSync(routesDir);
+}
 
-const upload = multer({ storage: storage });
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Middleware to serve static files (for frontend)
 app.use(express.static(path.join(__dirname, 'public')));
-// We will serve files through a custom route now, so direct static serving of /data is commented out.
-// app.use('/data', express.static(dataDir));
 
-// In-memory store for media metadata (can be replaced with a database later)
-let mediaStore = [];
+// API Routes
+app.use('/api', apiRouter);
 
-// --- API Endpoints ---
-
-// Add media
-app.post('/api/media', upload.single('mediaFile'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).send('No file uploaded.');
-    }
-
-    const id = req.file.filename.split('.')[0]; // UUID part of the filename
-    const displayName = req.body.displayName || req.file.originalname;
-    // Preserve case and replace spaces with %20 for the URL path segment
-    const urlFriendlyDisplayName = displayName.replace(/ /g, '%20');
-    const fileExtension = path.extname(req.file.originalname);
-
-    const media = {
-        id: id,
-        originalName: req.file.originalname,
-        displayName: displayName,
-        filename: req.file.filename, // The actual UUID-based filename on disk (e.g., uuid.ext)
-        path: req.file.path,       // Full path to the file on disk
-        mimetype: req.file.mimetype,
-        size: req.file.size,
-        // URL format: /media/uuid/Display%20Name.extension
-        url: `/media/${id}/${urlFriendlyDisplayName}${fileExtension}`,
-        createdAt: new Date()
-    };
-    mediaStore.push(media);
-    console.log('Media added:', media);
-    res.status(201).json(media);
-});
-
-// List media
-app.get('/api/media', (req, res) => {
-    res.json(mediaStore);
-});
-
-// Remove media
-app.delete('/api/media/:id', (req, res) => {
-    const mediaId = req.params.id;
-    const mediaIndex = mediaStore.findIndex(m => m.id === mediaId);
-
-    if (mediaIndex === -1) {
-        return res.status(404).send('Media not found.');
-    }
-
-    const mediaToRemove = mediaStore[mediaIndex];
-
-    fs.unlink(mediaToRemove.path, (err) => {
-        if (err) {
-            console.error('Error deleting file:', err);
-            return res.status(500).send('Error deleting media file.');
-        }
-        mediaStore.splice(mediaIndex, 1);
-        console.log('Media removed:', mediaToRemove);
-        res.status(200).send('Media removed successfully.');
-    });
-});
-
-// Generate "signed" URL (for now, just a direct URL)
-// In a real-world scenario with cloud storage, this would generate a pre-signed URL.
-app.get('/api/media/:id/url', (req, res) => {
-    const mediaId = req.params.id;
-    const media = mediaStore.find(m => m.id === mediaId);
-
-    if (!media) {
-        return res.status(404).send('Media not found.');
-    }
-    // For local storage, the "signed" URL is just the direct access URL.
-    // Add a dummy token for demonstration if needed, or just return the direct URL.
-    const baseUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
-    res.json({ signedUrl: `${baseUrl}${media.url}` });
-});
-
-// New route to serve media files using the user-friendly URL
+// Route to serve media files using the user-friendly URL
 // Example: GET /media/a1b2c3d4/My%20Cool%20Picture.jpg
-// The :displayNameWithExtension part will be URL-decoded by Express automatically
 app.get('/media/:mediaId/:displayNameWithExtension', (req, res) => {
-    const { mediaId, displayNameWithExtension } = req.params; // mediaId is the UUID
+    const { mediaId, displayNameWithExtension } = req.params;
 
-    // We find media primarily by ID, as it's unique.
-    // The displayNameWithExtension in the path is for user-friendliness and SEO,
-    // but the lookup is based on the unique mediaId.
+    // Find media primarily by ID
     const media = mediaStore.find(m => m.id === mediaId);
 
     if (media) {
-        // Security check: an attacker could try to manipulate the slug to access other files
-        // if we weren't careful. Here, we rely on the `media.path` which was set securely
-        // during upload and is based on the UUID filename.
+        // Security check: verify file exists and serve it
         if (fs.existsSync(media.path)) {
-            // Optional: Set Content-Disposition to suggest original filename for download
+            // Set appropriate headers for media serving
+            res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year cache
+            res.setHeader('Content-Type', media.mimetype);
+            
+            // Optional: Set Content-Disposition for download suggestion
             // res.setHeader('Content-Disposition', `inline; filename="${media.originalName}"`);
-            res.sendFile(media.path);
+            
+            res.sendFile(path.resolve(media.path));
         } else {
             console.error('File not found on disk for ID:', mediaId, media.path);
-            res.status(404).send('File not found on disk.');
+            res.status(404).json({
+                status: 'error',
+                message: 'Arquivo não encontrado no disco.',
+                error: 'FILE_NOT_FOUND'
+            });
         }
     } else {
         console.log('Media metadata not found for ID:', mediaId);
-        res.status(404).send('Media not found.');
+        res.status(404).json({
+            status: 'error',
+            message: 'Mídia não encontrada.',
+            error: 'MEDIA_NOT_FOUND'
+        });
     }
 });
 
+// Root route - serve the frontend
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
+// 404 handler for API routes
+app.use('/api/*', (req, res) => {
+    res.status(404).json({
+        status: 'error',
+        message: 'Endpoint da API não encontrado.',
+        error: 'ENDPOINT_NOT_FOUND',
+        availableEndpoints: [
+            'GET /api/health',
+            'GET /api/stats',
+            'GET /api/users',
+            'GET /api/users/:username/media',
+            'GET /api/media',
+            'POST /api/media',
+            'GET /api/media/:id',
+            'PUT /api/media/:id',
+            'DELETE /api/media/:id',
+            'GET /api/media/:id/url',
+            'GET /api/media/:id/download'
+        ]
+    });
+});
+
+// Global error handler
+app.use((error, req, res, next) => {
+    console.error('Global error handler:', error);
+    
+    res.status(500).json({
+        status: 'error',
+        message: 'Erro interno do servidor.',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_SERVER_ERROR'
+    });
+});
+
+// Start server
 app.listen(port, () => {
-    console.log(`Server running on port ${port}. Frontend accessible at ${process.env.FRONTEND_URL || `http://localhost:${port}`}`);
+    const baseUrl = process.env.FRONTEND_URL || `http://localhost:${port}`;
+    console.log('🚀 Hive Storage Server Started!');
+    console.log(`📱 Frontend: ${baseUrl}`);
+    console.log(`🔗 API Base URL: ${baseUrl}/api`);
+    console.log(`📚 API Documentation: Available in API_DOCUMENTATION.md`);
+    console.log(`🏥 Health Check: ${baseUrl}/api/health`);
+    console.log(`📊 Stats: ${baseUrl}/api/stats`);
+    console.log('');
+    console.log('📋 Available API Endpoints:');
+    console.log('  GET    /api/health          - Health check');
+    console.log('  GET    /api/stats           - Storage statistics');
+    console.log('  GET    /api/users           - List all users/folders');
+    console.log('  GET    /api/users/:username/media - List user media');
+    console.log('  GET    /api/media           - List all media (with filters)');
+    console.log('  POST   /api/media           - Upload new media');
+    console.log('  GET    /api/media/:id       - Get specific media');
+    console.log('  PUT    /api/media/:id       - Update media name');
+    console.log('  DELETE /api/media/:id       - Delete media');
+    console.log('  GET    /api/media/:id/url   - Get signed URL');
+    console.log('  GET    /api/media/:id/download - Download media');
+    console.log('');
 });

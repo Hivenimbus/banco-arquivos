@@ -1,113 +1,307 @@
 document.addEventListener('DOMContentLoaded', () => {
     const mediaFileInput = document.getElementById('mediaFile');
     const displayNameInput = document.getElementById('displayName');
+    const usernameInput = document.getElementById('username');
     const uploadButton = document.getElementById('uploadButton');
     const uploadStatus = document.getElementById('uploadStatus');
     const mediaListDiv = document.getElementById('mediaList');
+    const usersListDiv = document.getElementById('usersList');
+    const uploadArea = document.getElementById('uploadArea');
+    const emptyState = document.getElementById('emptyState');
+    const usersEmptyState = document.getElementById('usersEmptyState');
+    const usersSection = document.getElementById('usersSection');
+    const mediaSection = document.getElementById('mediaSection');
+    const backToUsersBtn = document.getElementById('backToUsers');
+    const mediaSectionTitle = document.getElementById('mediaSectionTitle');
+    
+    let currentView = 'users'; // 'users' or 'media'
+    let currentUser = null;
 
-    // --- Fetch and display media ---
-    async function fetchMedia() {
+    // --- Drag & Drop functionality ---
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('drag-over');
+    });
+
+    uploadArea.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            mediaFileInput.files = files;
+            // Trigger visual feedback
+            updateFileSelectedState(files[0]);
+        }
+    });
+
+    // File input change handler
+    mediaFileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            updateFileSelectedState(e.target.files[0]);
+        }
+    });
+
+    function updateFileSelectedState(file) {
+        const uploadText = uploadArea.querySelector('.upload-text');
+        if (file) {
+            uploadText.innerHTML = `Arquivo selecionado: <strong>${file.name}</strong><br><span class="upload-link">Clique para alterar</span>`;
+            uploadArea.style.borderColor = 'var(--success-color)';
+        }
+    }
+
+    // --- Navigation functions ---
+    function showUsersView() {
+        currentView = 'users';
+        currentUser = null;
+        usersSection.style.display = 'block';
+        mediaSection.style.display = 'none';
+        backToUsersBtn.style.display = 'none';
+        fetchUsers();
+    }
+    
+    function showMediaView(username) {
+        currentView = 'media';
+        currentUser = username;
+        usersSection.style.display = 'none';
+        mediaSection.style.display = 'block';
+        backToUsersBtn.style.display = 'inline-flex';
+        mediaSectionTitle.textContent = `Mídias de ${username}`;
+        fetchUserMedia(username);
+    }
+    
+    // Back button functionality
+    backToUsersBtn.addEventListener('click', showUsersView);
+
+    // --- Fetch and display users ---
+    async function fetchUsers() {
         try {
-            const response = await fetch('/api/media');
+            const response = await fetch('/api/users');
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            const mediaItems = await response.json();
-            renderMediaList(mediaItems);
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                renderUsersList(result.data);
+            } else {
+                throw new Error(result.message || 'Erro ao carregar usuários');
+            }
         } catch (error) {
-            console.error('Error fetching media:', error);
-            mediaListDiv.innerHTML = '<p>Error loading media. Please try again.</p>';
+            console.error('Error fetching users:', error);
+            showUsersEmptyState('Erro ao carregar usuários. Tente novamente.');
+        }
+    }
+    
+    function renderUsersList(users) {
+        usersListDiv.innerHTML = '';
+        
+        if (users.length === 0) {
+            showUsersEmptyState();
+            return;
+        }
+        
+        hideUsersEmptyState();
+        
+        users.forEach((user, index) => {
+            const userCard = document.createElement('div');
+            userCard.classList.add('user-card');
+            userCard.setAttribute('data-username', user.username);
+            userCard.style.animationDelay = `${index * 0.1}s`;
+            
+            const lastUploadDate = user.lastUpload ? 
+                new Date(user.lastUpload).toLocaleDateString('pt-BR') : 
+                'Nunca';
+            
+            userCard.innerHTML = `
+                <div class="user-icon">
+                    <i class="fas fa-folder"></i>
+                </div>
+                <div class="user-name">${user.username}</div>
+                <div class="user-stats">
+                    <strong>Arquivos:</strong> ${user.mediaCount}<br>
+                    <strong>Tamanho:</strong> ${user.totalSizeFormatted}<br>
+                    <strong>Último upload:</strong> ${lastUploadDate}
+                </div>
+            `;
+            
+            userCard.addEventListener('click', () => {
+                showMediaView(user.username);
+            });
+            
+            usersListDiv.appendChild(userCard);
+        });
+    }
+    
+    function showUsersEmptyState(customMessage = null) {
+        usersEmptyState.style.display = 'block';
+        usersListDiv.style.display = 'none';
+        if (customMessage) {
+            usersEmptyState.querySelector('p').textContent = customMessage;
+        }
+    }
+    
+    function hideUsersEmptyState() {
+        usersEmptyState.style.display = 'none';
+        usersListDiv.style.display = 'grid';
+    }
+
+    // --- Fetch and display user media ---
+    async function fetchUserMedia(username) {
+        try {
+            const response = await fetch(`/api/users/${encodeURIComponent(username)}/media`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                renderMediaList(result.data);
+            } else {
+                throw new Error(result.message || 'Erro ao carregar mídias do usuário');
+            }
+        } catch (error) {
+            console.error('Error fetching user media:', error);
+            showEmptyState('Erro ao carregar mídias. Tente novamente.');
         }
     }
 
     function renderMediaList(mediaItems) {
         mediaListDiv.innerHTML = ''; // Clear existing list
-
+        
         if (mediaItems.length === 0) {
-            mediaListDiv.innerHTML = '<p>No media files stored yet.</p>';
+            showEmptyState();
             return;
         }
 
-        mediaItems.forEach(media => {
+        hideEmptyState();
+
+        mediaItems.forEach((media, index) => {
             const mediaItemDiv = document.createElement('div');
             mediaItemDiv.classList.add('media-item');
             mediaItemDiv.setAttribute('data-id', media.id);
+            
+            // Add animation delay for staggered appearance
+            mediaItemDiv.style.animationDelay = `${index * 0.1}s`;
+
+            // Media preview container
+            const previewDiv = document.createElement('div');
+            previewDiv.classList.add('media-preview');
 
             let previewElement;
             if (media.mimetype.startsWith('image/')) {
                 previewElement = document.createElement('img');
                 previewElement.src = media.url;
                 previewElement.alt = media.displayName || media.originalName;
+                previewElement.loading = 'lazy';
             } else if (media.mimetype.startsWith('video/')) {
                 previewElement = document.createElement('video');
                 previewElement.src = media.url;
                 previewElement.controls = true;
+                previewElement.preload = 'metadata';
             } else if (media.mimetype.startsWith('audio/')) {
                 previewElement = document.createElement('audio');
                 previewElement.src = media.url;
                 previewElement.controls = true;
+                previewElement.preload = 'metadata';
             } else {
-                previewElement = document.createElement('p');
-                previewElement.textContent = `📄`; // File icon
-                const link = document.createElement('a');
-                link.href = media.url;
-                link.textContent = media.displayName || media.originalName;
-                link.target = "_blank";
-                previewElement.appendChild(document.createElement('br'));
-                previewElement.appendChild(link);
+                previewElement = document.createElement('div');
+                previewElement.innerHTML = '<i class="fas fa-file-alt file-icon"></i>';
+                previewElement.style.display = 'flex';
+                previewElement.style.alignItems = 'center';
+                previewElement.style.justifyContent = 'center';
+                previewElement.style.height = '100%';
             }
 
-            const nameP = document.createElement('p');
-            nameP.innerHTML = `<strong>Name:</strong> ${media.displayName || media.originalName}`;
+            previewDiv.appendChild(previewElement);
 
-            const idAndDateP = document.createElement('p');
-            idAndDateP.innerHTML = `<strong>ID:</strong> ${media.id}<br><strong>Uploaded:</strong> ${new Date(media.createdAt).toLocaleString()}`;
+            // Media info container
+            const infoDiv = document.createElement('div');
+            infoDiv.classList.add('media-info');
 
+            const nameDiv = document.createElement('div');
+            nameDiv.classList.add('media-name');
+            nameDiv.textContent = media.displayName || media.originalName;
+
+            const detailsDiv = document.createElement('div');
+            detailsDiv.classList.add('media-details');
+            detailsDiv.innerHTML = `
+                <strong>ID:</strong> ${media.id}<br>
+                <strong>Tipo:</strong> ${media.mimetype}<br>
+                <strong>Data:</strong> ${new Date(media.createdAt).toLocaleDateString('pt-BR')}
+            `;
 
             const actionsDiv = document.createElement('div');
-            actionsDiv.classList.add('actions');
-
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Delete';
-            deleteButton.classList.add('delete-btn');
-            deleteButton.onclick = () => deleteMedia(media.id);
+            actionsDiv.classList.add('media-actions');
 
             const urlButton = document.createElement('button');
-            urlButton.textContent = 'Get URL';
-            urlButton.classList.add('url-btn');
+            urlButton.innerHTML = '<i class="fas fa-link"></i> URL';
+            urlButton.classList.add('btn', 'btn-success');
             urlButton.onclick = () => getSignedUrl(media.id);
 
-            actionsDiv.appendChild(deleteButton);
-            actionsDiv.appendChild(urlButton);
+            const deleteButton = document.createElement('button');
+            deleteButton.innerHTML = '<i class="fas fa-trash"></i> Excluir';
+            deleteButton.classList.add('btn', 'btn-danger');
+            deleteButton.onclick = () => deleteMedia(media.id);
 
-            mediaItemDiv.appendChild(previewElement);
-            mediaItemDiv.appendChild(nameP);
-            mediaItemDiv.appendChild(idAndDateP);
-            mediaItemDiv.appendChild(actionsDiv);
+            actionsDiv.appendChild(urlButton);
+            actionsDiv.appendChild(deleteButton);
+
+            infoDiv.appendChild(nameDiv);
+            infoDiv.appendChild(detailsDiv);
+            infoDiv.appendChild(actionsDiv);
+
+            mediaItemDiv.appendChild(previewDiv);
+            mediaItemDiv.appendChild(infoDiv);
 
             mediaListDiv.appendChild(mediaItemDiv);
         });
+    }
+
+    function showEmptyState(customMessage = null) {
+        emptyState.style.display = 'block';
+        mediaListDiv.style.display = 'none';
+        if (customMessage) {
+            emptyState.querySelector('p').textContent = customMessage;
+        }
+    }
+
+    function hideEmptyState() {
+        emptyState.style.display = 'none';
+        mediaListDiv.style.display = 'grid';
     }
 
     // --- Upload media ---
     uploadButton.addEventListener('click', async () => {
         const file = mediaFileInput.files[0];
         const displayName = displayNameInput.value.trim();
+        const username = usernameInput.value.trim();
 
         if (!file) {
-            uploadStatus.textContent = 'Please select a file to upload.';
-            uploadStatus.style.color = 'red';
+            showUploadStatus('Por favor, selecione um arquivo para upload.', 'error');
+            return;
+        }
+        
+        if (!username) {
+            showUploadStatus('Por favor, insira um nome de usuário.', 'error');
             return;
         }
 
         const formData = new FormData();
         formData.append('mediaFile', file);
+        formData.append('username', username);
         if (displayName) {
             formData.append('displayName', displayName);
         }
 
-        uploadStatus.textContent = 'Uploading...';
-        uploadStatus.style.color = 'orange';
+        // Update UI state
+        uploadButton.disabled = true;
+        uploadButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fazendo Upload...';
+        showUploadStatus('Fazendo upload...', 'loading');
 
         try {
             const response = await fetch('/api/media', {
@@ -115,41 +309,91 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: formData,
             });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Upload failed: ${response.status} ${errorText}`);
+            const result = await response.json();
+
+            if (!response.ok || result.status !== 'success') {
+                throw new Error(result.message || `Upload falhou: ${response.status}`);
             }
 
-            const result = await response.json();
-            uploadStatus.textContent = `Successfully uploaded: ${result.displayName || result.originalName}`;
-            uploadStatus.style.color = 'green';
-            mediaFileInput.value = ''; // Clear the file input
-            displayNameInput.value = ''; // Clear the display name input
-            fetchMedia(); // Refresh the list
+            showUploadStatus(result.message || `Upload realizado com sucesso: ${result.data.displayName || result.data.originalName}`, 'success');
+            
+            // Reset form
+            mediaFileInput.value = '';
+            displayNameInput.value = '';
+            usernameInput.value = '';
+            resetUploadArea();
+            
+            // Refresh the appropriate view
+            if (currentView === 'users') {
+                fetchUsers();
+            } else if (currentView === 'media' && currentUser === username) {
+                fetchUserMedia(currentUser);
+            }
         } catch (error) {
             console.error('Error uploading file:', error);
-            uploadStatus.textContent = `Error: ${error.message}`;
-            uploadStatus.style.color = 'red';
+            showUploadStatus(`Erro: ${error.message}`, 'error');
+        } finally {
+            // Reset button state
+            uploadButton.disabled = false;
+            uploadButton.innerHTML = '<i class="fas fa-upload"></i> <span>Fazer Upload</span>';
         }
     });
 
+    function showUploadStatus(message, type) {
+        uploadStatus.textContent = message;
+        uploadStatus.className = `upload-status show ${type}`;
+        
+        // Auto hide after 5 seconds for success/error messages
+        if (type === 'success' || type === 'error') {
+            setTimeout(() => {
+                uploadStatus.classList.remove('show');
+            }, 5000);
+        }
+    }
+
+    function resetUploadArea() {
+        const uploadText = uploadArea.querySelector('.upload-text');
+        uploadText.innerHTML = 'Arraste e solte seus arquivos aqui ou <span class="upload-link">clique para selecionar</span>';
+        uploadArea.style.borderColor = '';
+    }
+
     // --- Delete media ---
     async function deleteMedia(mediaId) {
-        if (!confirm('Are you sure you want to delete this media?')) {
+        if (!confirm('Tem certeza que deseja excluir esta mídia?')) {
             return;
         }
+        
         try {
             const response = await fetch(`/api/media/${mediaId}`, {
                 method: 'DELETE',
             });
-            if (!response.ok) {
-                throw new Error(`Failed to delete media: ${response.status}`);
+            
+            const result = await response.json();
+            
+            if (!response.ok || result.status !== 'success') {
+                throw new Error(result.message || `Falha ao excluir mídia: ${response.status}`);
             }
+            
             console.log('Media deleted:', mediaId);
-            fetchMedia(); // Refresh list
+            
+            // Add fade out animation to the item
+            const mediaItem = document.querySelector(`[data-id="${mediaId}"]`);
+            if (mediaItem) {
+                mediaItem.style.transition = 'all 0.3s ease';
+                mediaItem.style.opacity = '0';
+                mediaItem.style.transform = 'scale(0.8)';
+                setTimeout(() => {
+                    // Refresh the appropriate view
+                    if (currentView === 'users') {
+                        fetchUsers();
+                    } else if (currentView === 'media' && currentUser) {
+                        fetchUserMedia(currentUser);
+                    }
+                }, 300);
+            }
         } catch (error) {
             console.error('Error deleting media:', error);
-            alert('Error deleting media: ' + error.message);
+            alert('Erro ao excluir mídia: ' + error.message);
         }
     }
 
@@ -157,85 +401,85 @@ document.addEventListener('DOMContentLoaded', () => {
     async function getSignedUrl(mediaId) {
         try {
             const response = await fetch(`/api/media/${mediaId}/url`);
-            if (!response.ok) {
-                throw new Error(`Failed to get URL: ${response.status}`);
+            const result = await response.json();
+            
+            if (!response.ok || result.status !== 'success') {
+                throw new Error(result.message || `Falha ao obter URL: ${response.status}`);
             }
-            const data = await response.json();
-            showSignedUrlModal(data.signedUrl);
+            
+            showSignedUrlModal(result.data.signedUrl);
         } catch (error) {
             console.error('Error getting signed URL:', error);
-            alert('Error getting URL: ' + error.message);
+            alert('Erro ao obter URL: ' + error.message);
         }
     }
 
     // --- Modal for Signed URL ---
     function showSignedUrlModal(url) {
-        // Remove existing modal if any
-        const existingModal = document.getElementById('signedUrlModal');
-        if (existingModal) {
-            existingModal.remove();
-        }
+        const modal = document.getElementById('urlModal');
+        const signedUrlInput = document.getElementById('signedUrl');
+        const copyBtn = document.getElementById('copyUrlBtn');
+        const closeBtn = document.getElementById('closeModal');
 
-        const modal = document.createElement('div');
-        modal.id = 'signedUrlModal';
-        modal.classList.add('modal');
+        signedUrlInput.value = url;
+        modal.style.display = 'block';
+        
+        // Add show class for animation
+        setTimeout(() => {
+            modal.classList.add('show');
+        }, 10);
 
-        const modalContent = document.createElement('div');
-        modalContent.classList.add('modal-content');
-
-        const closeBtn = document.createElement('span');
-        closeBtn.classList.add('close-btn');
-        closeBtn.innerHTML = '&times;';
-        closeBtn.onclick = () => {
-            modal.style.display = 'none';
-            modal.remove();
-        };
-
-        const title = document.createElement('h3');
-        title.textContent = 'Media URL';
-
-        const urlInput = document.createElement('input');
-        urlInput.type = 'text';
-        urlInput.value = url;
-        urlInput.readOnly = true;
-        urlInput.onclick = () => { // Select text on click
-            urlInput.select();
-            urlInput.setSelectionRange(0, 99999); // For mobile devices
+        // Copy URL functionality
+        copyBtn.onclick = async () => {
             try {
-                document.execCommand('copy'); // Copy to clipboard (older method)
-                alert('URL copied to clipboard!');
+                await navigator.clipboard.writeText(url);
+                copyBtn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+                copyBtn.style.background = 'var(--success-color)';
+                
+                setTimeout(() => {
+                    copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copiar URL';
+                    copyBtn.style.background = '';
+                }, 2000);
             } catch (err) {
-                // Fallback for browsers that don't support execCommand
-                // Or use Clipboard API if available and preferred
-                console.warn('Could not copy URL automatically. Please copy manually.');
+                // Fallback for older browsers
+                signedUrlInput.select();
+                signedUrlInput.setSelectionRange(0, 99999);
+                try {
+                    document.execCommand('copy');
+                    copyBtn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+                    copyBtn.style.background = 'var(--success-color)';
+                } catch (e) {
+                    alert('Não foi possível copiar automaticamente. Por favor, copie manualmente.');
+                }
             }
         };
 
+        // Close modal functionality
+        function closeModal() {
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+        }
 
-        const copyInstruction = document.createElement('p');
-        copyInstruction.textContent = 'Click the URL to copy it.';
-        copyInstruction.style.fontSize = '0.9em';
-        copyInstruction.style.color = '#555';
-
-
-        modalContent.appendChild(closeBtn);
-        modalContent.appendChild(title);
-        modalContent.appendChild(urlInput);
-        modalContent.appendChild(copyInstruction);
-        modal.appendChild(modalContent);
-        document.body.appendChild(modal);
-
-        modal.style.display = 'block';
+        closeBtn.onclick = closeModal;
 
         // Close modal if user clicks outside of it
-        window.onclick = function(event) {
-            if (event.target == modal) {
-                modal.style.display = 'none';
-                modal.remove();
+        modal.onclick = function(event) {
+            if (event.target === modal) {
+                closeModal();
             }
-        }
+        };
+
+        // Close modal with ESC key
+        document.addEventListener('keydown', function escKeyHandler(event) {
+            if (event.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', escKeyHandler);
+            }
+        });
     }
 
     // Initial load
-    fetchMedia();
+    showUsersView();
 });

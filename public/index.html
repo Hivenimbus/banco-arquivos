@@ -1,27 +1,126 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Media Storage</title>
+    <title>Hive Storage - Armazenamento de Mídia</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <h1>Media Storage</h1>
-
-        <div class="upload-section">
-            <h2>Add New Media</h2>
-            <input type="file" id="mediaFile" name="mediaFile">
-            <input type="text" id="displayName" placeholder="Optional: Display name for the file">
-            <button id="uploadButton">Upload</button>
-            <p id="uploadStatus"></p>
+    <div class="background-gradient"></div>
+    
+    <header class="header">
+        <div class="container">
+            <div class="logo">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <h1>Hive Storage</h1>
+            </div>
+            <p class="subtitle">Armazene e gerencie seus arquivos de mídia com facilidade</p>
         </div>
+    </header>
 
-        <div class="media-list-section">
-            <h2>Stored Media</h2>
-            <div id="mediaList">
-                <!-- Media items will be populated here by JavaScript -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Upload Section -->
+            <section class="upload-section card">
+                <div class="section-header">
+                    <i class="fas fa-plus-circle"></i>
+                    <h2>Adicionar Nova Mídia</h2>
+                </div>
+                
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-content">
+                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                        <p class="upload-text">Arraste e solte seus arquivos aqui ou <span class="upload-link">clique para selecionar</span></p>
+                        <input type="file" id="mediaFile" name="mediaFile" class="file-input">
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <div class="input-wrapper">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="username" placeholder="Nome do usuário/pasta (obrigatório)" class="text-input" required>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <div class="input-wrapper">
+                        <i class="fas fa-tag"></i>
+                        <input type="text" id="displayName" placeholder="Nome personalizado (opcional)" class="text-input">
+                    </div>
+                </div>
+                
+                <button id="uploadButton" class="btn btn-primary">
+                    <i class="fas fa-upload"></i>
+                    <span>Fazer Upload</span>
+                </button>
+                
+                <div id="uploadStatus" class="upload-status"></div>
+            </section>
+
+            <!-- Navigation Section -->
+            <section class="navigation-section">
+                <div class="breadcrumb">
+                    <button id="backToUsers" class="btn btn-secondary" style="display: none;">
+                        <i class="fas fa-arrow-left"></i>
+                        Voltar para Usuários
+                    </button>
+                </div>
+            </section>
+
+            <!-- Users List Section -->
+            <section class="users-list-section" id="usersSection">
+                <div class="section-header">
+                    <i class="fas fa-users"></i>
+                    <h2>Usuários / Pastas</h2>
+                </div>
+                
+                <div id="usersList" class="users-grid">
+                    <!-- User folders will be populated here by JavaScript -->
+                </div>
+                
+                <div class="empty-state" id="usersEmptyState" style="display: none;">
+                    <i class="fas fa-users"></i>
+                    <h3>Nenhum usuário encontrado</h3>
+                    <p>Faça upload do seu primeiro arquivo para criar uma pasta</p>
+                </div>
+            </section>
+
+            <!-- Media List Section -->
+            <section class="media-list-section" id="mediaSection" style="display: none;">
+                <div class="section-header">
+                    <i class="fas fa-images"></i>
+                    <h2 id="mediaSectionTitle">Mídias do Usuário</h2>
+                </div>
+                
+                <div id="mediaList" class="media-grid">
+                    <!-- Media items will be populated here by JavaScript -->
+                </div>
+                
+                <div class="empty-state" id="emptyState" style="display: none;">
+                    <i class="fas fa-folder-open"></i>
+                    <h3>Nenhuma mídia encontrada</h3>
+                    <p>Este usuário ainda não possui arquivos</p>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Modal for signed URL -->
+    <div id="urlModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-link"></i> URL do Arquivo</h3>
+                <span class="close-btn" id="closeModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="signedUrl" readonly class="url-input">
+                <button id="copyUrlBtn" class="btn btn-secondary">
+                    <i class="fas fa-copy"></i>
+                    Copiar URL
+                </button>
             </div>
         </div>
     </div>
