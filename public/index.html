@@ -11,6 +11,31 @@
 <body>
     <div class="background-gradient"></div>
     
+    <!-- Authentication Modal -->
+    <div id="authModal" class="auth-modal">
+        <div class="auth-modal-content">
+            <div class="auth-header">
+                <i class="fas fa-key"></i>
+                <h2>Autenticação Necessária</h2>
+                <p>Digite sua API Key para acessar o Hive Storage</p>
+            </div>
+            <div class="auth-body">
+                <div class="input-wrapper">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="apiKeyInput" placeholder="Digite sua API Key" class="text-input">
+                </div>
+                <button id="authButton" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Entrar</span>
+                </button>
+                <div id="authError" class="auth-error"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Application (hidden until authenticated) -->
+    <div id="mainApp" style="display: none;">
+    
     <header class="header">
         <div class="container">
             <div class="logo">
@@ -124,6 +149,8 @@
             </div>
         </div>
     </div>
+    
+    </div> <!-- End of mainApp -->
 
     <script src="script.js"></script>
 </body>

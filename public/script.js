@@ -1,4 +1,12 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
+    // Authentication elements
+    const authModal = document.getElementById('authModal');
+    const authButton = document.getElementById('authButton');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const authError = document.getElementById('authError');
+    const mainApp = document.getElementById('mainApp');
+    
+    // Main app elements
     const mediaFileInput = document.getElementById('mediaFile');
     const displayNameInput = document.getElementById('displayName');
     const usernameInput = document.getElementById('username');
@@ -16,6 +24,111 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let currentView = 'users'; // 'users' or 'media'
     let currentUser = null;
+    let apiKey = null;
+    
+    // Check if user is already authenticated
+    const storedApiKey = localStorage.getItem('hive_api_key');
+    if (storedApiKey) {
+        apiKey = storedApiKey;
+        showMainApp();
+    } else {
+        showAuthModal();
+    }
+    
+    // Authentication functions
+    function showAuthModal() {
+        authModal.style.display = 'flex';
+        mainApp.style.display = 'none';
+        apiKeyInput.focus();
+    }
+    
+    function showMainApp() {
+        authModal.style.display = 'none';
+        mainApp.style.display = 'block';
+        showUsersView();
+    }
+    
+    function showAuthError(message) {
+        authError.textContent = message;
+        authError.classList.add('show');
+        setTimeout(() => {
+            authError.classList.remove('show');
+        }, 5000);
+    }
+    
+    // Authentication event listeners
+    authButton.addEventListener('click', authenticateUser);
+    apiKeyInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            authenticateUser();
+        }
+    });
+    
+    async function authenticateUser() {
+        const inputApiKey = apiKeyInput.value.trim();
+        
+        if (!inputApiKey) {
+            showAuthError('Por favor, digite sua API Key');
+            return;
+        }
+        
+        // Update button state
+        authButton.disabled = true;
+        authButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
+        
+        try {
+             // Test the API key with the users endpoint
+             const response = await fetch('/api/users', {
+                 headers: {
+                     'x-api-key': inputApiKey
+                 }
+             });
+            
+            if (response.ok) {
+                // API key is valid
+                apiKey = inputApiKey;
+                localStorage.setItem('hive_api_key', apiKey);
+                apiKeyInput.value = '';
+                showMainApp();
+            } else if (response.status === 401 || response.status === 403) {
+                showAuthError('API Key inválida. Verifique e tente novamente.');
+            } else {
+                showAuthError('Erro ao verificar API Key. Tente novamente.');
+            }
+        } catch (error) {
+            console.error('Authentication error:', error);
+            showAuthError('Erro de conexão. Verifique sua internet e tente novamente.');
+        } finally {
+            // Reset button state
+            authButton.disabled = false;
+            authButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> <span>Entrar</span>';
+        }
+    }
+    
+    // Function to get headers with API key
+    function getAuthHeaders() {
+        return {
+            'x-api-key': apiKey
+        };
+    }
+    
+    // Add logout functionality (optional)
+    function logout() {
+        localStorage.removeItem('hive_api_key');
+        apiKey = null;
+        showAuthModal();
+    }
+    
+    // Add logout button to header (you can uncomment this if you want a logout button)
+    // const header = document.querySelector('.header .container');
+    // const logoutBtn = document.createElement('button');
+    // logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Sair';
+    // logoutBtn.className = 'btn btn-secondary';
+    // logoutBtn.style.position = 'absolute';
+    // logoutBtn.style.top = '1rem';
+    // logoutBtn.style.right = '1rem';
+    // logoutBtn.addEventListener('click', logout);
+    // header.appendChild(logoutBtn);
 
     // --- Drag & Drop functionality ---
     uploadArea.addEventListener('dragover', (e) => {
@@ -80,8 +193,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Fetch and display users ---
     async function fetchUsers() {
         try {
-            const response = await fetch('/api/users');
+            const response = await fetch('/api/users', {
+                headers: getAuthHeaders()
+            });
             if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    logout();
+                    return;
+                }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const result = await response.json();
@@ -153,8 +272,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Fetch and display user media ---
     async function fetchUserMedia(username) {
         try {
-            const response = await fetch(`/api/users/${encodeURIComponent(username)}/media`);
+            const response = await fetch(`/api/users/${encodeURIComponent(username)}/media`, {
+                headers: getAuthHeaders()
+            });
             if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    logout();
+                    return;
+                }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const result = await response.json();
@@ -306,13 +431,22 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('/api/media', {
                 method: 'POST',
+                headers: getAuthHeaders(),
                 body: formData,
             });
 
             const result = await response.json();
 
-            if (!response.ok || result.status !== 'success') {
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    logout();
+                    return;
+                }
                 throw new Error(result.message || `Upload falhou: ${response.status}`);
+            }
+            
+            if (result.status !== 'success') {
+                throw new Error(result.message || 'Upload falhou');
             }
 
             showUploadStatus(result.message || `Upload realizado com sucesso: ${result.data.displayName || result.data.originalName}`, 'success');
@@ -366,12 +500,21 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(`/api/media/${mediaId}`, {
                 method: 'DELETE',
+                headers: getAuthHeaders()
             });
             
             const result = await response.json();
             
-            if (!response.ok || result.status !== 'success') {
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    logout();
+                    return;
+                }
                 throw new Error(result.message || `Falha ao excluir mídia: ${response.status}`);
+            }
+            
+            if (result.status !== 'success') {
+                throw new Error(result.message || 'Falha ao excluir mídia');
             }
             
             console.log('Media deleted:', mediaId);
@@ -400,11 +543,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Get Signed URL ---
     async function getSignedUrl(mediaId) {
         try {
-            const response = await fetch(`/api/media/${mediaId}/url`);
+            const response = await fetch(`/api/media/${mediaId}/url`, {
+                headers: getAuthHeaders()
+            });
             const result = await response.json();
             
-            if (!response.ok || result.status !== 'success') {
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    logout();
+                    return;
+                }
                 throw new Error(result.message || `Falha ao obter URL: ${response.status}`);
+            }
+            
+            if (result.status !== 'success') {
+                throw new Error(result.message || 'Falha ao obter URL');
             }
             
             showSignedUrlModal(result.data.signedUrl);
