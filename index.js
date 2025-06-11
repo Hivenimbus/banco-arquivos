@@ -1,6 +1,7 @@
 require('dotenv').config(); // Load environment variables
 
 const express = require('express');
+const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 
@@ -21,6 +22,14 @@ const routesDir = path.join(__dirname, 'routes');
 if (!fs.existsSync(routesDir)) {
     fs.mkdirSync(routesDir);
 }
+
+// CORS Configuration
+app.use(cors({
+    origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
 
 // Middleware
 app.use(express.json());

@@ -6,6 +6,39 @@ const path = require('path');
 
 const router = express.Router();
 
+// API Key authentication middleware
+const authenticateApiKey = (req, res, next) => {
+    const apiKey = req.headers['x-api-key'] || req.query.apikey;
+    const validApiKey = process.env.API_KEY || 'hive-storage-default-key';
+    
+    if (!apiKey) {
+        return res.status(401).json({
+            status: 'error',
+            message: 'API Key é obrigatória. Forneça a chave via header "x-api-key" ou query parameter "apikey".',
+            error: 'MISSING_API_KEY'
+        });
+    }
+    
+    if (apiKey !== validApiKey) {
+        return res.status(403).json({
+            status: 'error',
+            message: 'API Key inválida.',
+            error: 'INVALID_API_KEY'
+        });
+    }
+    
+    next();
+};
+
+// Apply API Key authentication to all routes except health check
+router.use((req, res, next) => {
+    // Skip authentication for health check endpoint
+    if (req.path === '/health') {
+        return next();
+    }
+    return authenticateApiKey(req, res, next);
+});
+
 // Create data directory if it doesn't exist
 const dataDir = path.join(__dirname, '..', 'data');
 if (!fs.existsSync(dataDir)) {
@@ -855,4 +888,4 @@ router.get('/media/:id/download', (req, res) => {
 module.exports = {
     router,
     mediaStore
-}; 
+};

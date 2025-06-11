@@ -13,5 +13,19 @@
     "createdAt": "2025-06-04T20:54:28.810Z",
     "updatedAt": "2025-06-03T21:27:51.016Z",
     "recovered": true
+  },
+  {
+    "id": "411422fc-4b6d-40a4-b733-4b4c7decd302",
+    "user": "Diogo",
+    "originalName": "background.png",
+    "displayName": "background",
+    "filename": "411422fc-4b6d-40a4-b733-4b4c7decd302.png",
+    "path": "C:\\Users\\diogo\\OneDrive\\Área de Trabalho\\HiveNimbus\\alteraçoes-bucket\\banco-arquivos\\data\\default\\411422fc-4b6d-40a4-b733-4b4c7decd302.png",
+    "mimetype": "image/png",
+    "size": 2052980,
+    "sizeFormatted": "1.96 MB",
+    "url": "/media/411422fc-4b6d-40a4-b733-4b4c7decd302/background.png",
+    "createdAt": "2025-06-11T22:09:44.760Z",
+    "updatedAt": "2025-06-11T22:09:44.760Z"
   }
 ]

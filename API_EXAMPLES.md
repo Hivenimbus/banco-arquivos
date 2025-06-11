@@ -2,51 +2,74 @@
 
 ## 📝 Como Testar a API
 
-### 1️⃣ **Health Check**
+> **⚠️ Importante:** Todos os endpoints (exceto `/health`) requerem autenticação via API Key.
+
+### 🔐 **Configuração da API Key**
+
+Antes de testar, configure sua API Key no arquivo `.env`:
+```env
+API_KEY=sua-api-key-segura
+```
+
+### 1️⃣ **Health Check** (Não requer API Key)
 ```bash
 curl http://localhost:3000/api/health
 ```
 
 ### 2️⃣ **Estatísticas**
 ```bash
-curl http://localhost:3000/api/stats
+# Usando header (recomendado)
+curl -H "x-api-key: sua-api-key-segura" \
+  http://localhost:3000/api/stats
+
+# Usando query parameter
+curl "http://localhost:3000/api/stats?apikey=sua-api-key-segura"
 ```
 
 ### 3️⃣ **Upload de Arquivo**
 ```bash
 # Upload simples
 curl -X POST \
-  http://localhost:3000/api/media \
-  -F "mediaFile=@exemplo.jpg"
-
-# Upload com nome personalizado
-curl -X POST \
-  http://localhost:3000/api/media \
+  -H "x-api-key: sua-api-key-segura" \
   -F "mediaFile=@exemplo.jpg" \
-  -F "displayName=Minha Foto Especial"
+  http://localhost:3000/api/media
+
+# Upload com nome personalizado e usuário
+curl -X POST \
+  -H "x-api-key: sua-api-key-segura" \
+  -F "mediaFile=@exemplo.jpg" \
+  -F "displayName=Minha Foto Especial" \
+  -F "username=joao" \
+  http://localhost:3000/api/media
 ```
 
 ### 4️⃣ **Listar Todas as Mídias**
 ```bash
 # Listar todas
-curl http://localhost:3000/api/media
+curl -H "x-api-key: sua-api-key-segura" \
+  http://localhost:3000/api/media
 
 # Com paginação
-curl "http://localhost:3000/api/media?page=1&limit=5"
+curl -H "x-api-key: sua-api-key-segura" \
+  "http://localhost:3000/api/media?page=1&limit=5"
 
 # Filtrar por tipo
-curl "http://localhost:3000/api/media?type=image"
+curl -H "x-api-key: sua-api-key-segura" \
+  "http://localhost:3000/api/media?type=image"
 
 # Buscar por nome
-curl "http://localhost:3000/api/media?search=foto"
+curl -H "x-api-key: sua-api-key-segura" \
+  "http://localhost:3000/api/media?search=foto"
 
 # Ordenar por tamanho (crescente)
-curl "http://localhost:3000/api/media?sort=size&order=asc"
+curl -H "x-api-key: sua-api-key-segura" \
+  "http://localhost:3000/api/media?sort=size&order=asc"
 ```
 
 ### 5️⃣ **Obter Mídia Específica**
 ```bash
-curl http://localhost:3000/api/media/SEU_UUID_AQUI
+curl -H "x-api-key: sua-api-key-segura" \
+  http://localhost:3000/api/media/SEU_UUID_AQUI
 ```
 
 ### 6️⃣ **Atualizar Nome da Mídia**
@@ -324,4 +347,4 @@ print(f"Search results: {len(media)} files")
 
 ---
 
-*Guia de testes para Hive Storage API v1.0.0* 
+*Guia de testes para Hive Storage API v1.0.0*

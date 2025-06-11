@@ -8,8 +8,59 @@ A **Hive Storage API** é uma API RESTful para gerenciamento de arquivos de míd
 
 ---
 
+## 🔐 Autenticação
+
+Todos os endpoints da API (exceto `/api/health`) requerem autenticação via **API Key**.
+
+### Como usar a API Key
+
+Você pode fornecer a API Key de duas formas:
+
+1. **Header HTTP** (recomendado):
+   ```
+   x-api-key: sua-api-key-aqui
+   ```
+
+2. **Query Parameter**:
+   ```
+   GET /api/stats?apikey=sua-api-key-aqui
+   ```
+
+### Configuração
+
+A API Key é configurada através da variável de ambiente `API_KEY` no arquivo `.env`:
+
+```env
+API_KEY=sua-api-key-segura
+```
+
+Se não configurada, a API usará a chave padrão: `hive-storage-default-key`
+
+### Respostas de Erro de Autenticação
+
+**401 - API Key não fornecida:**
+```json
+{
+  "status": "error",
+  "message": "API Key é obrigatória. Forneça a chave via header 'x-api-key' ou query parameter 'apikey'.",
+  "error": "MISSING_API_KEY"
+}
+```
+
+**403 - API Key inválida:**
+```json
+{
+  "status": "error",
+  "message": "API Key inválida.",
+  "error": "INVALID_API_KEY"
+}
+```
+
+---
+
 ## 📋 Índice
 
+- [Autenticação](#autenticação)
 - [Status e Saúde](#status-e-saúde)
 - [Estatísticas](#estatísticas)
 - [Gerenciamento de Mídia](#gerenciamento-de-mídia)
@@ -450,4 +501,4 @@ Para um ambiente de produção, considere:
 
 ---
 
-*Documentação gerada automaticamente para Hive Storage API v1.0.0* 
+*Documentação gerada automaticamente para Hive Storage API v1.0.0*
